@@ -1,0 +1,18 @@
+API:
+  BASE_URL: "https://api.nytimes.com/svc/"
+  TIME_WIRES_CONTEXT: "news/v3/content/all/%s.json?limit=500&api-key="
+  TIME_WIRES_CONTEXT_ALL: "news/v3/content/all/all.json?limit=500&api-key="
+  TIME_WIRES_SECTIONS_LIST: "news/v3/content/section-list.json?api-key="
+  BOOKS_CONTEXT: "books/v3/lists/full-overview.json?api-key="
+  MOVIES_REVIEWS_CONTEXT: "movies/v2/reviews/search.json?query=godfather&api-key="
+  ARTICLES_CONTEXT: "search/v2/articlesearch.json?q=election&api-key="
+SCRAPING:
+  CROME_USER_AGENT: "{'User-Agent': 'Chrome/39.0.2171.95'}"  
+  MOZILLA_USER_AGENT: "{'User-Agent': 'Mozilla/5.0'}"
+ELASTIC_SEARCH:
+  API_URL: "http://34.243.151.152:9200"
+  ARTICLE_INDEX: "articles"
+DB:
+  DB_HOST: "localhost"
+  DB_PORT: "5432"
+  DB_NAME: "NyTimes"

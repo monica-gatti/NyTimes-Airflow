@@ -1,0 +1,8 @@
+API:
+  api_key: AuG5HVISw4jzEit5G0RkacWynWZ8jtTF
+DB:
+  usr: airflow
+  pwd: airflow
+ELASTIC_SEARCH:
+  usr: elastic
+  pwd: datascientest

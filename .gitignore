@@ -1,0 +1,4 @@
+.airflowignore
+logs/
+dags/nytimes/__pycache__/
+dags/nytimes/nytimes_common_package/__pycache__/
