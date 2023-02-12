@@ -18,8 +18,8 @@ class Article(Base):
     section = Column(String(255), unique=False, nullable=False)
     subsection = Column(String(255))
     url = Column(String(5000))
-    webPageAvailability = Column(String(1))
     apiInvokeDate = Column(DateTime)
+    scraped = Column(String(1))
  
     def __repr__(self):
         return "<articles %r>" % self.title

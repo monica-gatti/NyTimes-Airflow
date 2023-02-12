@@ -2,7 +2,6 @@ import psycopg2
 from sqlalchemy import create_engine
 import yaml
 import os
-#from typing import Literal
 from datetime import datetime
 from elasticsearch import Elasticsearch
 import logging
