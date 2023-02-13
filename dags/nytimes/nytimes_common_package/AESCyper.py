@@ -5,7 +5,7 @@ from Crypto.Cipher import AES
 import os
 
 nonce = b'\x19\x07v\x96\x80~E\xff\x94;zO\x8d\x0b\x14q'
-str_key =  os.environ.get('NYTIMES_CYPHER_KEY')
+str_key = '6v8y/B?E(H+MbQeThWmZq4t7w!z$C&F)'# os.environ.get('NYTIMES_CYPHER_KEY')
 
 def sym_encrypt(data):
     key = str_key.encode("utf-8")
@@ -19,7 +19,7 @@ def sym_decrypt(data):
     return cipher.decrypt(binascii.unhexlify(data)).decode("utf8").rstrip()
 
 #example Ev3ryD%40ta
-# enc = sym_encrypt("Ev3ryD%40ta")
+# enc = sym_encrypt("datascientest")
 # print(enc)
 # dec = sym_decrypt(enc)
 # print(dec)

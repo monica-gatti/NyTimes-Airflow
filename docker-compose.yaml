@@ -44,6 +44,9 @@ x-airflow-common:
       dockerfile: Dockerfile
   environment:
     &airflow-common-env
+    NYTIMES_CYPHER_KEY: '6v8y/B?E(H+MbQeThWmZq4t7w!z$C&F)'
+    NYTIMES_ENV: 'dev'
+    SQLALCHEMY_SILENCE_UBER_WARNING: '1'
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
@@ -52,14 +55,12 @@ x-airflow-common:
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKEND: 'airflow.api.auth.backend.basic_auth'
-    SQLALCHEMY_SILENCE_UBER_WARNING: '1'
-    NYTIMES_CYPHER_KEY: '6v8y/B?E(H+MbQeThWmZq4t7w!z$C&F)'
-    NYTIMES_ENV: 'dev'
 
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
+    - ./export:/opt/airflow/export
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-50000}"
   depends_on:
     redis:

@@ -1,9 +1,10 @@
+import csv
 from airflow import DAG
 from airflow.utils.dates import days_ago
 from airflow.operators.python import PythonOperator
 from nytimes.nytimes_common_package.utils import checkESIndexExists, createIndexEs
 from nytimes.nytimes_common_package.model import Article, Author
-from nytimes.nytimes_common_package.utils import dbPostgresGetEngine, logActivity, getNYTUrl, getUserAgent, getStringCurrentDate, ingestArticlesEs
+from nytimes.nytimes_common_package.utils import dbPostgresGetEngine, getNYTUrl, getStringCurrentDate, ingestArticlesEs
 from bs4 import BeautifulSoup as bs
 from urllib.request import urlopen, Request
 from datetime import datetime
@@ -13,6 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from psycopg2 import IntegrityError, errors
 import json
 import requests
+import boto3
 
 webscrapingdagbysection = DAG(
     dag_id='nytimes_webscraping_by_section_dag',
@@ -43,7 +45,7 @@ def getNYTimesArticlesListBySectionFromAPI():
     engine = dbPostgresGetEngine()
     Session = sessionmaker(bind=engine)
     s = Session()
-    for element in sectionListData["results"][1:3:1]:
+    for element in sectionListData["results"][2:3:1]:
         section = element["section"]
         timeWireApiUrl = getNYTUrl(context="TIME_WIRES_CONTEXT")
         sectionUrl = timeWireApiUrl % section
@@ -55,16 +57,17 @@ def getNYTimesArticlesListBySectionFromAPI():
             url = result["url"]
             authors = result["byline"].replace("BY", "").replace("AND", ",").split(",")
             try:
+                authors = result["byline"].replace("BY", "").replace("AND", "-")
                 article = Article( slug_id= result["slug_name"],article_date =result["created_date"],title = result["title"],section = result["section"],
-                subsection = result["subsection"],url = url,apiInvokeDate = datetime.now(), scraped = "N")
+                subsection = result["subsection"], authors = authors, url = url, apiInvokeDate = datetime.now(), scraped = "N", exported= 'N')
                 s.add(article)
                 s.flush()
                 s.commit()
-                for item in authors:
+                for item in authors.split("-"):
                     author = Author( slug_id = result["slug_name"] , fullname = item)
                     s.add(author)
-                    s.flush()
-                    s.commit()
+                s.flush()
+                s.commit()
             except UniqueViolation as uv:
                 continue    
             except IntegrityError as e:
@@ -76,7 +79,7 @@ def getNYTimesArticlesListBySectionFromAPI():
                 continue
             except Exception as err:
                 print(err)
-                raise
+                continue
     s.close()
     sleep(2)
 
@@ -99,10 +102,12 @@ def scrapeArticles():
                 body = body + t.text
             ingestArticlesEs(article.slug_id, article.article_date, body )
             article.scraped = "Y"
+            article.word_count = len(body
+            )
             s.add(article)
             s.commit()
             s.flush()
-            sleep(2)
+            sleep(1)
         except Exception as err:
             print(err)
             continue
@@ -110,20 +115,67 @@ def scrapeArticles():
     print("TimeWires - Ended Scraping Articles")
     print(n)
 
-nytimes_import_articles_by_section_task = PythonOperator(
-    task_id='import_articles',
+def createfile(**kwargs):
+    engine = dbPostgresGetEngine()
+    Session = sessionmaker(bind=engine)
+    s = Session()
+    article_filename = getStringCurrentDate() + '_article.csv'
+    article_filepath = '/opt/airflow/export/' + article_filename
+
+    with open(article_filepath, 'w') as f:
+        out = csv.writer(f)
+        out.writerow(['slug_id','article_date','title', 'section', 'subsection', 'word_count', 'authors', 'url'])
+     
+        for item in s.query(Article).filter(Article.exported == 'N').all():
+            out.writerow([item.slug_id,item.article_date, item.title,item.section, item.subsection, item.word_count, item.authors, item.url])
+            item.exported = 'Y'
+            s.add(item)
+            s.flush()
+            s.commit()
+    s.close()
+    kwargs['ti'].xcom_push(key='articlefilename', value=article_filename)
+    kwargs['ti'].xcom_push(key='articlefilepath', value=article_filepath)
+
+
+def file_to_s3(**kwargs):
+    #Creating Session With Boto3.
+    session = boto3.Session(
+    aws_access_key_id='AKIA4HQGPGUGRW3UN2FL',
+    aws_secret_access_key='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'
+    )
+    articleFilename=kwargs['ti'].xcom_pull(key = 'articlefilename', task_ids='transform_articles_data_in_csv')
+    articleFilepath=kwargs['ti'].xcom_pull(key = 'articlefilepath', task_ids='transform_articles_data_in_csv')
+    #Creating S3 Resource From the Session.
+    s3 = session.resource('s3')
+
+    result = s3.Bucket('articlestorage').upload_file(articleFilepath, articleFilename )
+
+    return (result)
+
+nytimes_es_create_index_task = PythonOperator(
+    task_id='setup',
+    python_callable=createESIndex,
+    dag=webscrapingdagbysection
+)
+nytimes_import_articles_task = PythonOperator(
+    task_id='extract_articles_data_by_section_from_API',
     python_callable=getNYTimesArticlesListBySectionFromAPI,
     dag=webscrapingdagbysection
 )
 nytimes_scrape_articles_task = PythonOperator(
-    task_id='scrape_articles',
+    task_id='extract_articles_data_from_web_scraping',
     python_callable=scrapeArticles,
     dag=webscrapingdagbysection
 )
-nytimes_es_create_index_task = PythonOperator(
-    task_id='create_es_index',
-    python_callable=createESIndex,
+
+nytimes_transform_articles_task = PythonOperator(
+    task_id='transform_articles_data_in_csv',
+    python_callable=createfile,
     dag=webscrapingdagbysection
 )
-
-nytimes_es_create_index_task >> nytimes_import_articles_by_section_task >> nytimes_scrape_articles_task
+nytimes_load_articles_task = PythonOperator(
+    task_id='load_data',
+    python_callable=file_to_s3,
+    dag=webscrapingdagbysection
+)
+nytimes_es_create_index_task >> nytimes_import_articles_task >> nytimes_scrape_articles_task >> nytimes_transform_articles_task >> nytimes_load_articles_task

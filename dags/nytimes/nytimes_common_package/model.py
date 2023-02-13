@@ -16,10 +16,13 @@ class Article(Base):
     article_date = Column(DateTime, unique=False, nullable=False)
     title = Column(String(255), nullable=False)
     section = Column(String(255), unique=False, nullable=False)
-    subsection = Column(String(255))
+    subsection = Column(String(1024))
+    authors = Column(String(255))
     url = Column(String(5000))
     apiInvokeDate = Column(DateTime)
     scraped = Column(String(1))
+    exported = Column(String(1))
+    word_count = Column(Integer, nullable=True)
  
     def __repr__(self):
         return "<articles %r>" % self.title
